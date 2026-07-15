@@ -18,9 +18,9 @@ const PATTERNS = [
   ['jwt', /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{5,}(?![A-Za-z0-9_-])/g],
   ['bearer', /\b[Bb]earer\s+[A-Za-z0-9._~+/=-]{20,}/g],
   ['connection-string', /\b(?:AccountKey|SharedAccessKey|sas_token)=[^;\s'"]{16,}/g],
-  // Captures identifier / separator / optional-quote / value separately so
+  // Captures identifier / separator / whitespace / optional-quote / value separately so
   // the callback can treat `=` (env/config) and `:` (YAML/prose) differently.
-  ['password-assign', /([A-Za-z0-9_.-]*(?:password|passwd|pwd|secret|token|credential|api[_-]?key|access[_-]?key)[A-Za-z0-9_.-]*)\s*([=:])\s*(['"]?)([^\s'";,[\]`]{6,})/gi],
+  ['password-assign', /([A-Za-z0-9_.-]*(?:password|passwd|pwd|secret|token|credential|api[_-]?key|access[_-]?key)[A-Za-z0-9_.-]*)\s*([=:])(\s*)(['"]?)([^\s'";,[\]`]{6,})/gi],
 ];
 
 function shannon(s) {
@@ -36,8 +36,13 @@ function shannon(s) {
 // outside [a-z-], so the first clause reduces to "has a digit"; the second
 // clause catches symbol-bearing values (e.g. `P@ssword!`) even without one.
 // Plain words like `regcred` / `rotated` / `db-credentials` have neither and
-// are spared.
+// are spared. Exempt version strings (v1.2.3) and ISO dates (2026-07-16T...).
 function looksSecretShaped(value) {
+  // Versions: v1.2.3, 1.2.3, etc.
+  if (/^v?\d+(?:\.\d+)+$/.test(value)) return false;
+  // ISO dates: 2026-07-16, 2026-07-16T10:00:00Z, etc.
+  if (/^\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z?)?$/.test(value)) return false;
+
   const hasDigit = /[0-9]/.test(value);
   const hasNonDashSymbol = /[^A-Za-z0-9-]/.test(value);
   return hasDigit || hasNonDashSymbol;
@@ -48,8 +53,8 @@ export function redact(text) {
   let out = String(text);
   for (const [type, re] of PATTERNS) {
     if (type === 'password-assign') {
-      out = out.replace(re, (match, id, sep, quote, value) => {
-        if (PATH_SHAPE_RE.test(value)) return match; // path-shaped value, not a secret
+      out = out.replace(re, (match, id, sep, ws, quote, value) => {
+        if (value.includes('/') && PATH_SHAPE_RE.test(value)) return match; // path-shaped value, not a secret
         if (sep === ':') {
           // YAML/prose form: only redact when the keyword anchors the
           // identifier's end AND the value itself looks secret-shaped.
@@ -57,7 +62,7 @@ export function redact(text) {
           if (!looksSecretShaped(value)) return match;
         }
         hits.push(type);
-        return `${id}${sep}${quote}[REDACTED:${type}]`;
+        return `${id}${sep}${ws}${quote}[REDACTED:${type}]`;
       });
     } else {
       out = out.replace(re, () => { hits.push(type); return `[REDACTED:${type}]`; });

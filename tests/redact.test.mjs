@@ -95,3 +95,23 @@ test('yaml-style real secrets still redact in :-form', () => {
   assert.ok(!r.text.includes('Sup3rS3cret!x'));
   assert.ok(r.text.includes('db_password:'));
 });
+
+test('all-lowercase secrets without slashes still redact', () => {
+  for (const s of [
+    'export DB_PASSWORD=devpassword123',
+    'DB_PASSWORD=correcthorsebatterystaple',
+    'token=abcdef0123456789abcdef0123456789',
+    'API_TOKEN=xk3jq9vmzp2wr8tn5ycd0hbs',
+  ]) assert.ok(redact(s).text.includes('[REDACTED:password-assign]'), s);
+});
+
+test('k8s stringData lowercase secrets redact', () => {
+  const r = redact('stringData:\n password: admin123\n api-key: c4f3d00dbeef42');
+  assert.ok(!r.text.includes('admin123'));
+  assert.ok(!r.text.includes('c4f3d00dbeef42'));
+});
+
+test('versions and dates after keyword identifiers stay untouched', () => {
+  for (const s of ['token: v2.10.0', 'secretExpiry: 2026-07-16T10:00:00Z'])
+    assert.equal(redact(s).text, s, s);
+});
