@@ -44,6 +44,19 @@ export function resolveRange(arg, now = new Date()) {
   } else if (DAY_RE.test(arg)) { start = end = label = arg; }
   else if (RANGE_RE.test(arg)) { [, start, end] = arg.match(RANGE_RE); label = `${start}..${end}`; }
   else throw new Error(`Unrecognized range: ${arg}. Use today|yesterday|week|lastweek|YYYY-MM-DD|A..B`);
+
+  // Validate explicit dates (not derived from today/yesterday/week)
+  const isExplicit = DAY_RE.test(arg) || RANGE_RE.test(arg);
+  if (isExplicit) {
+    const validateDate = (d) => {
+      if (localMidnight(d).toLocaleDateString('sv-SE') !== d) {
+        throw new Error(`Invalid calendar date: ${d}`);
+      }
+    };
+    validateDate(start);
+    validateDate(end);
+  }
+
   if (start > end) throw new Error(`Range start ${start} is after end ${end}`);
   const days = [];
   for (let d = start; d <= end; d = addDays(d, 1)) days.push(d);

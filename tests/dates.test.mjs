@@ -56,3 +56,9 @@ test('localMidnight constructs local 00:00', () => {
   assert.equal(d.getHours(), 0);
   assert.equal(d.getDate(), 15);
 });
+
+test('calendar-invalid dates throw instead of rolling over', () => {
+  assert.throws(() => resolveRange('2026-02-30'), /Invalid calendar date/);
+  assert.throws(() => resolveRange('2026-07-01..2026-13-01'), /Invalid calendar date/);
+  assert.throws(() => resolveRange('2026-00-10'), /Invalid calendar date/);
+});
