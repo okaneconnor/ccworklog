@@ -73,3 +73,25 @@ test('typed markers are not relabeled by the generic pass', () => {
 test('ASIA STS keys are redacted', () => {
   assert.ok(redact('ASIAIOSFODNN7EXAMPLE').text.includes('[REDACTED:aws-access-key]'));
 });
+
+test('slash-containing secret values still redact (path guard is shape-based)', () => {
+  const r = redact('DB_PASSWORD=abc/12345Xy set in env');
+  assert.ok(!r.text.includes('abc/12345Xy'));
+  const r2 = redact("REDIS_PASSWORD='x7fJ/2kQ9zLmN0p'");
+  assert.ok(!r2.text.includes('x7fJ/2kQ9zLmN0p'));
+});
+
+test('k8s/prose after secret-ish words in :-form is untouched', () => {
+  for (const s of [
+    'Created secret: db-credentials in namespace prod',
+    'imagePullSecret: regcred applied',
+    'Updated credentials: rotated for the postgres exporter',
+    'tokenExpiry: 2026-07-16T10:00:00Z',
+  ]) assert.equal(redact(s).text, s, s);
+});
+
+test('yaml-style real secrets still redact in :-form', () => {
+  const r = redact('db_password: Sup3rS3cret!x');
+  assert.ok(!r.text.includes('Sup3rS3cret!x'));
+  assert.ok(r.text.includes('db_password:'));
+});
