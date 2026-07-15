@@ -71,3 +71,26 @@ test('ai-title and pr-link harvested to meta; unknown types counted not fatal; b
 test('unreadable file returns null', () => {
   assert.equal(parseSession('/no/such/file.jsonl'), null);
 });
+
+test('stderr warnings on successful commands are not tool errors', () => {
+  const { entries } = session([
+    { type: 'user', timestamp: T, message: { content: [{ type: 'tool_result', content: 'x' }] },
+      toolUseResult: { stdout: 'ok', stderr: 'npm warn deprecated foo@1.0.0', exitCode: 0 } },
+    { type: 'user', timestamp: T, message: { content: [{ type: 'tool_result', content: 'x' }] },
+      toolUseResult: { stderr: 'Error: real failure without exit code' } },
+  ]);
+  const errs = entries.filter((e) => e.kind === 'tool_error');
+  assert.equal(errs.length, 1);
+  assert.equal(errs[0].line, 'Error: real failure without exit code');
+});
+
+test('isMeta entries are fully dropped — no meta capture, no tool_error', () => {
+  const { meta, entries } = session([
+    { type: 'user', timestamp: T, isMeta: true, cwd: '/meta/cwd', gitBranch: 'meta-branch',
+      message: { content: 'noise' }, toolUseResult: { stderr: 'Error: boom', exitCode: 1 } },
+    { type: 'user', timestamp: T, cwd: '/real/cwd', gitBranch: 'main', message: { content: 'real' } },
+  ]);
+  assert.equal(meta.cwd, '/real/cwd');
+  assert.equal(meta.gitBranch, 'main');
+  assert.equal(entries.filter((e) => e.kind === 'tool_error').length, 0);
+});

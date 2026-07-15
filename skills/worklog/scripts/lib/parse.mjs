@@ -46,15 +46,20 @@ function ingest(e, meta, entries) {
     return;
   }
   if (t === 'user') {
+    if (e.isMeta === true) return;
     if (e.cwd && !meta.cwd) meta.cwd = e.cwd;
     if (e.gitBranch) meta.gitBranch = e.gitBranch;
     const r = e.toolUseResult;
-    if (r && typeof r === 'object' &&
-        (r.stderr || r.interrupted || (r.exitCode !== undefined && r.exitCode !== 0))) {
-      const first = String(r.stderr || r.stdout || '').split('\n').find((l) => l.trim()) ?? '';
-      entries.push({ kind: 'tool_error', ts: e.timestamp ?? null, exitCode: r.exitCode ?? null, line: first.slice(0, 400) });
+    if (r && typeof r === 'object') {
+      const failed = r.interrupted === true
+        || (r.exitCode !== undefined && r.exitCode !== null && r.exitCode !== 0)
+        || (r.exitCode === undefined && typeof r.stderr === 'string'
+            && /\b(error|fatal|exception|traceback|denied|refused)\b/i.test(r.stderr));
+      if (failed) {
+        const first = String(r.stderr || r.stdout || '').split('\n').find((l) => l.trim()) ?? '';
+        entries.push({ kind: 'tool_error', ts: e.timestamp ?? null, exitCode: r.exitCode ?? null, line: first.slice(0, 400) });
+      }
     }
-    if (e.isMeta === true) return;
     let text = promptText(e.message?.content);
     if (text == null) return;
     text = text.replace(WRAPPER_RE, '').trim();
