@@ -1,0 +1,11 @@
+{
+  "name": "ccworklog",
+  "owner": { "name": "Connor O'Kane" },
+  "plugins": [
+    {
+      "name": "ccworklog",
+      "source": "./",
+      "description": "/worklog — daily/weekly work-summary reports from your Claude Code sessions + git. 100% local."
+    }
+  ]
+}

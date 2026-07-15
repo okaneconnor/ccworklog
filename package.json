@@ -1,0 +1,9 @@
+{
+  "name": "ccworklog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "TZ=Europe/London node --test tests/**/*.mjs"
+  }
+}
