@@ -40,7 +40,7 @@
 - Test: `tests/scaffold.test.mjs`
 
 **Interfaces:**
-- Produces: repo layout all later tasks assume; `npm test` runs `TZ=Europe/London node --test tests/`.
+- Produces: repo layout all later tasks assume; `npm test` runs `TZ=Europe/London node --test tests/**/*.mjs`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -74,7 +74,7 @@ test('package.json declares zero dependencies', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `TZ=Europe/London node --test tests/`
+Run: `TZ=Europe/London node --test tests/**/*.mjs`
 Expected: FAIL — `ENOENT .claude-plugin/plugin.json`
 
 - [ ] **Step 3: Create the files**
@@ -112,7 +112,7 @@ Expected: FAIL — `ENOENT .claude-plugin/plugin.json`
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "TZ=Europe/London node --test tests/"
+    "test": "TZ=Europe/London node --test tests/**/*.mjs"
   }
 }
 ```
