@@ -16,4 +16,5 @@ test('SKILL.md has required frontmatter and orchestration guardrails', () => {
   assert.ok(s.includes('STILL invalid after that one retry'));
   assert.ok(s.includes('first 300 characters'));
   assert.ok(s.includes('If the user declines, STOP'));
+  assert.ok(s.includes('SIZE IS A BINDING CONSTRAINT'));
 });

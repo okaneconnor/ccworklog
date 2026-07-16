@@ -55,6 +55,8 @@ containing this file.
 
 ## Digest Prompt (per pack — substitute {PACK_PATH}, {DIGEST_PATH})
 
+> SIZE IS A BINDING CONSTRAINT: total digest JSON under 2000 characters (hard reject over 4096). For busy sessions: at most 4-5 items, one-sentence details, at most 2 file paths per evidence block. Cut detail before cutting items.
+>
 > Read the JSON file {PACK_PATH} — an evidence pack from one Claude Code session on one day
 > (fields: prompts, files, commands, errors, assistant, title, gitBranch, prLinks, _digestKey).
 > Write a digest JSON to {DIGEST_PATH} using the Write tool, then reply with exactly one line:

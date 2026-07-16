@@ -12,6 +12,11 @@ try {
   process.stderr.write(`ccworklog render: cannot read report: ${reportPath}: ${err.message}\n`);
   process.exit(1);
 }
+try {
+  chmodSync(reportPath, 0o600);
+} catch (err) {
+  // ignore chmod failures
+}
 const reportsDir = dirname(reportPath);
 const base = dirname(reportsDir);
 const stem = basename(reportPath).replace(/\.report\.json$/, '');
