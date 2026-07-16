@@ -1001,7 +1001,7 @@ export function collectGitEvidence(cwds, { sinceISO, untilISO }) {
   - `writeJson(path, obj)` — pretty JSON + chmod 600
   - `digestKey({size, mtimeMs}) → 'size:mtime:v1'`; `isDigestValid(digestPath, transcriptStat) → bool` (checks stored `_key`)
   - `validateDigest(obj) → { ok, errors }` — items need claim+outcome; zero-anchor items get `low_confidence: true`; hard reject > 4096 chars (target ≤ 2000)
-  - `premerge(base, days) → { workstreams, inputHash }` — groups digests by ticket-ID (regex `\b[A-Z][A-Z0-9]{1,9}-\d+\b` over branch + items) falling back to `project@branch`; deterministic ordering; sha256-based `inputHash`.
+  - `premerge(base, days) → { workstreams, inputHash }` — groups digests by ticket-ID (regex `\b[A-Z][A-Z0-9]{1,9}-\d+\b` over branch only — item prose is not a sanctioned ticket source) falling back to `project@branch`; deterministic ordering; sha256-based `inputHash`.
 
 - [ ] **Step 1: Write the failing test**
 
