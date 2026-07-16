@@ -1,8 +1,8 @@
 // tests/render.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 
@@ -52,4 +52,32 @@ test('terminal recap has standup, threads, and report path; standup.md written; 
   assert.ok(md.includes('Automated gluetun port sync'));
   const threads = JSON.parse(readFileSync(join(dataDirPath, 'threads.json'), 'utf8'));
   assert.equal(threads.open[0].id, 't-1');
+});
+
+test('label cannot traverse outside the reports dir', () => {
+  const dataDirPath = mkdtempSync(join(tmpdir(), 'ccwr-'));
+  mkdirSync(join(dataDirPath, 'reports'), { recursive: true });
+  const reportPath = join(dataDirPath, 'reports', '2026-07-15.report.json');
+  writeFileSync(reportPath, JSON.stringify({ ...REPORT, label: '../../evil' }));
+  execFileSync('node', ['skills/worklog/scripts/render.mjs', reportPath], { encoding: 'utf8' });
+  assert.ok(existsSync(join(dataDirPath, 'reports', '2026-07-15.html')));
+  assert.ok(!existsSync(join(dirname(dataDirPath), 'evil.html')));
+});
+
+test('missing report fails with one clean line, no stack', () => {
+  let out;
+  try {
+    execFileSync('node', ['skills/worklog/scripts/render.mjs', '/no/such/report.json'], { encoding: 'utf8', stdio: 'pipe' });
+    assert.fail('should have exited non-zero');
+  } catch (e) {
+    assert.equal(e.status, 1);
+    assert.match(e.stderr, /ccworklog render: cannot read report/);
+    assert.ok(!e.stderr.includes('at '));  // no stack frames
+  }
+});
+
+test('html and standup.md are chmod 600', () => {
+  const { dataDirPath } = setup();
+  assert.equal(statSync(join(dataDirPath, 'reports', '2026-07-15.html')).mode & 0o777, 0o600);
+  assert.equal(statSync(join(dataDirPath, 'reports', '2026-07-15.standup.md')).mode & 0o777, 0o600);
 });
