@@ -59,6 +59,8 @@ test('collect writes packs, flags trivial, reports parse health', () => {
   assert.equal(pack.title, 'Fix terraform cycle');
   assert.ok(pack._digestKey.includes(':v1'));
   assert.equal(m.parseHealth.unknownTypes['weird-future-type'], 1);
+  const packRaw = readFileSync(p1.packPath, 'utf8');
+  assert.ok(JSON.parse(packRaw) && JSON.stringify(JSON.parse(packRaw)).length <= 100000);
 });
 
 test('collect on an empty day short-circuits', () => {

@@ -9,6 +9,9 @@ import {
   dataDir, readConfig, writeJson, digestKey, isDigestValid, validateDigest, premerge,
 } from './lib/store.mjs';
 
+const PACK_BUDGET = 100_000;
+const STAMP_RESERVE = 200; // reserve for post-build _digestKey stamping
+
 const [cmd, rangeArg] = process.argv.slice(2);
 const range = resolveRange(rangeArg);
 const base = dataDir();
@@ -42,12 +45,16 @@ function collect() {
     for (const [k, v] of Object.entries(session.meta.unknownTypes)) {
       health.unknownTypes[k] = (health.unknownTypes[k] ?? 0) + v;
     }
-    for (const pack of buildEvidencePacks(session, range.days)) {
+    for (const pack of buildEvidencePacks(session, range.days, PACK_BUDGET - STAMP_RESERVE)) {
       const dayDir = join(base, 'evidence', pack.day);
       mkdirSync(dayDir, { recursive: true });
       const packPath = join(dayDir, `${pack.sessionId}.json`);
       const digestPath = join(base, 'digests', `${pack.sessionId}-${pack.day}.json`);
       pack._digestKey = digestKey(t);
+      // Defensive check: flag if stamping caused pack to exceed budget
+      if (JSON.stringify(pack).length > PACK_BUDGET) {
+        pack.note = (pack.note || '') + ' [over-budget after stamping]';
+      }
       writeJson(packPath, pack);
       packs.push({
         sessionId: pack.sessionId, day: pack.day, title: pack.title,
