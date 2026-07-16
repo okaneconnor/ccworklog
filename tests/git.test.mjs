@@ -18,7 +18,7 @@ function repo(email) {
   return { dir, g };
 }
 
-const WIDE = { sinceISO: '2000-01-01T00:00:00+00:00', untilISO: '2100-01-01T00:00:00+00:00' };
+const WIDE = { sinceISO: '2000-01-01T00:00:00+00:00', untilISO: '2099-12-31T23:59:59+00:00' };
 
 test('collects own commits, dedupes monorepo subdirs, skips dead paths', () => {
   const { dir } = repo('me@example.com');
@@ -51,4 +51,41 @@ test('other authors are filtered out', () => {
   // author filter comes from *current* repo config → coworker@example.com
   const out = collectGitEvidence([dir], WIDE);
   assert.deepEqual(out[0].commits.map((c) => c.subject), ['coworker commit']);
+});
+
+test('early-morning commits inside the window are included; outside excluded', () => {
+  const { dir, g } = repo('me@example.com');
+  const commitAt = (iso, file) => {
+    writeFileSync(join(dir, file), file);
+    g('add', '.');
+    execFileSync('git', ['commit', '-q', '-m', `commit ${file}`], {
+      cwd: dir, encoding: 'utf8',
+      env: { ...process.env, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_DATE: iso },
+    });
+  };
+  commitAt('2026-07-15T00:30:00+01:00', 'early.txt');   // 00:30 local, in window
+  commitAt('2026-07-14T23:30:00+01:00', 'before.txt');  // previous local day
+  const out = collectGitEvidence([dir], {
+    sinceISO: '2026-07-15T00:00:00+01:00',
+    untilISO: '2026-07-16T00:00:00+01:00',
+  });
+  const subjects = out[0].commits.map((c) => c.subject);
+  assert.ok(subjects.includes('commit early.txt'));
+  assert.ok(!subjects.includes('commit before.txt'));
+});
+
+test('--author escapes regex metacharacters and anchors the email', () => {
+  const { dir, g } = repo('connor.okane@example.com');
+  writeFileSync(join(dir, 'dot.txt'), 'dot');
+  g('add', '.');
+  g('commit', '-q', '-m', 'commit by dotted email');
+  g('config', 'user.email', 'connorXokane@example.com');
+  writeFileSync(join(dir, 'x.txt'), 'x');
+  g('add', '.');
+  g('commit', '-q', '-m', 'commit by X email');
+  g('config', 'user.email', 'connor.okane@example.com');
+  const out = collectGitEvidence([dir], WIDE);
+  const subjects = out[0].commits.map((c) => c.subject);
+  assert.ok(subjects.includes('commit by dotted email'));
+  assert.ok(!subjects.includes('commit by X email'));
 });
