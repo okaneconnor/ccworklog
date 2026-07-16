@@ -58,3 +58,47 @@ test('files and commands deduped from tool_use', () => {
   assert.deepEqual(p.files, ['/r/a.tf']);
   assert.deepEqual(p.commands, ['terraform apply']);
 });
+
+test('metadata fields are redacted at build time', () => {
+  const m = { ...meta, title: 'Session about AKIAIOSFODNN7EXAMPLE', gitBranch: 'feat/token=ghp_abcdefghijklmnopqrstuvwxyz012345' };
+  const entries = [
+    { kind: 'prompt', ts: '2026-07-10T10:00:00Z', text: 'hi there friend' },
+    { kind: 'tool_use', ts: '2026-07-10T10:01:00Z', tool: 'Edit', file: '/r/AKIAIOSFODNN7EXAMPLE.txt' },
+  ];
+  const p = buildEvidencePacks({ meta: m, entries }, ['2026-07-10'])[0];
+  const raw = JSON.stringify(p);
+  assert.ok(!raw.includes('AKIAIOSFODNN7EXAMPLE'));
+  assert.ok(!raw.includes('ghp_abcdefghijklmnopqrstuvwxyz012345'));
+});
+
+test('errors shed before prompts under pressure; prompts survive', () => {
+  const entries = [
+    ...Array.from({ length: 4 }, (_, i) => ({ kind: 'prompt', ts: '2026-07-10T10:00:00Z', text: `prompt number ${i}` })),
+    ...Array.from({ length: 50 }, (_, i) => ({ kind: 'tool_error', ts: '2026-07-10T10:01:00Z', exitCode: 1, line: `Error: ${'x'.repeat(390)} ${i}` })),
+  ];
+  const p = buildEvidencePacks({ meta, entries }, ['2026-07-10'], 5000)[0];
+  assert.equal(p.prompts.length, 4);
+  assert.ok(p.errors.length < 50);
+  assert.equal(p.elided, true);
+});
+
+test('budget ceiling is a hard guarantee even with giant prompts', () => {
+  const entries = [
+    { kind: 'prompt', ts: '2026-07-10T10:00:00Z', text: 'y'.repeat(60000) },
+    { kind: 'prompt', ts: '2026-07-10T10:01:00Z', text: 'z'.repeat(60000) },
+  ];
+  const p = buildEvidencePacks({ meta, entries }, ['2026-07-10'], 5000)[0];
+  assert.ok(JSON.stringify(p).length <= 5000);
+  assert.equal(p.elided, true);
+  assert.ok(p.note.includes('ELIDED'));
+});
+
+test('firstTs/lastTs are min/max regardless of entry order', () => {
+  const entries = [
+    { kind: 'prompt', ts: '2026-07-10T18:00:00Z', text: 'later entry first' },
+    { kind: 'prompt', ts: '2026-07-10T09:00:00Z', text: 'earlier entry second' },
+  ];
+  const p = buildEvidencePacks({ meta, entries }, ['2026-07-10'])[0];
+  assert.equal(p.firstTs, '2026-07-10T09:00:00Z');
+  assert.equal(p.lastTs, '2026-07-10T18:00:00Z');
+});
