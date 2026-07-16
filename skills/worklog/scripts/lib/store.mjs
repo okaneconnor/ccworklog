@@ -22,7 +22,7 @@ export function readConfig(base) {
 }
 
 export function writeJson(path, obj) {
-  writeFileSync(path, JSON.stringify(obj, null, 1));
+  writeFileSync(path, JSON.stringify(obj, null, 1), { mode: 0o600 });
   try { chmodSync(path, 0o600); } catch { /* windows / exotic fs */ }
 }
 
@@ -35,6 +35,7 @@ export function isDigestValid(path, stat) {
   try { return JSON.parse(readFileSync(path, 'utf8'))._key === digestKey(stat); } catch { return false; }
 }
 
+// Validates digest shape, size, and anchors; mutates items in place to set low_confidence.
 export function validateDigest(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return { ok: false, errors: ['digest is not an object'] };
   const errors = [];
@@ -64,17 +65,34 @@ export function premerge(base, days) {
   }
   const groups = new Map();
   for (const d of digests) {
-    const hay = `${d.branch ?? ''} ${JSON.stringify(d.items ?? [])}`;
-    const tickets = [...new Set([...hay.matchAll(TICKET_RE)].map((m) => m[1]))].sort();
+    // Scan only branch for ticket IDs; prose in items is not a sanctioned source.
+    const tickets = [...new Set([...(d.branch ?? '').matchAll(TICKET_RE)].map((m) => m[1]))]
+      .sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
     const key = tickets[0] || `${d.project ?? 'unknown'}@${d.branch ?? '-'}`;
     if (!groups.has(key)) {
-      groups.set(key, { workstream: key, project: d.project ?? null, branch: d.branch ?? null, tickets, digests: [] });
+      const projects = d.project ? [d.project] : [];
+      groups.set(key, {
+        workstream: key, project: d.project ?? null, projects, branch: d.branch ?? null, tickets, digests: [],
+      });
+    } else {
+      // Union tickets and projects from digests with same key.
+      const group = groups.get(key);
+      const allTickets = [...new Set([...group.tickets, ...tickets])].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+      group.tickets = allTickets;
+      if (d.project && !group.projects.includes(d.project)) {
+        group.projects.push(d.project);
+        group.projects.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+      }
     }
     groups.get(key).digests.push(d);
   }
-  const workstreams = [...groups.values()].sort((a, b) => a.workstream.localeCompare(b.workstream));
+  const workstreams = [...groups.values()].sort((a, b) => a.workstream < b.workstream ? -1 : a.workstream > b.workstream ? 1 : 0);
   for (const w of workstreams) {
-    w.digests.sort((a, b) => String(a.firstTs ?? '').localeCompare(String(b.firstTs ?? '')));
+    w.digests.sort((a, b) => {
+      const aTs = String(a.firstTs ?? '');
+      const bTs = String(b.firstTs ?? '');
+      return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
+    });
   }
   const inputHash = createHash('sha256').update(JSON.stringify(workstreams)).digest('hex').slice(0, 16);
   return { workstreams, inputHash };

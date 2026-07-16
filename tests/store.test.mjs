@@ -66,6 +66,32 @@ test('premerge groups by ticket id then project@branch, deterministic hash', () 
   assert.equal(a.inputHash, b.inputHash); // deterministic
 });
 
+test('ticket ids come only from branch — prose identifiers do not create workstreams', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
+  const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });
+  writeJson(join(base, 'digests', 'p1-2026-07-15.json'),
+    { day: '2026-07-15', project: 'infra', branch: 'main',
+      items: [{ claim: 'Patched CVE-2024-3094 per RFC-7231', outcome: 'patched', evidence: { files: ['f'] } }] });
+  const r = premerge(base, ['2026-07-15']);
+  assert.equal(r.workstreams.length, 1);
+  assert.equal(r.workstreams[0].workstream, 'infra@main');
+});
+
+test('cross-project same-ticket digests merge with projects/tickets unioned', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
+  const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });
+  writeJson(join(base, 'digests', 'a-2026-07-15.json'),
+    { day: '2026-07-15', project: 'api', branch: 'feat/PLAT-9-server', firstTs: '1', items: [{ claim: 'a', outcome: 'a', evidence: { files: ['f'] } }] });
+  writeJson(join(base, 'digests', 'b-2026-07-15.json'),
+    { day: '2026-07-15', project: 'web', branch: 'PLAT-9-client', firstTs: '2', items: [{ claim: 'b', outcome: 'b', evidence: { files: ['g'] } }] });
+  const r = premerge(base, ['2026-07-15']);
+  assert.equal(r.workstreams.length, 1);
+  const w = r.workstreams[0];
+  assert.equal(w.workstream, 'PLAT-9');
+  assert.deepEqual(w.projects, ['api', 'web']);
+  assert.deepEqual(w.tickets, ['PLAT-9']);
+});
+
 test('readConfig returns {} when missing, parses when present', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
   const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });
