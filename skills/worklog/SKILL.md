@@ -28,16 +28,16 @@ containing this file.
 3. **Cold-run gate.** If `manifest.packsToDigest > 15`: tell the user how many sessions
    need digesting and roughly how long it will take (~15–20s per batch of 4), note that
    digests are cached so an interrupted run loses nothing, and confirm with AskUserQuestion
-   before proceeding.
+   before proceeding. If the user declines, STOP — print one line telling them how to run a smaller range (e.g. /worklog today). Do not proceed with a partial run.
 
 4. **MAP.** For every pack with `digestValid: false` and `trivial: false` (manifest order
-   is newest-first — keep it), spawn digest subagents with the Task tool in batches of
-   AT MOST 4 concurrent, `subagent_type: general-purpose`, `model: haiku`. Use the Digest
+   is newest-first — keep it), spawn digest subagents with the Task tool, keeping AT MOST 4 digest subagents in flight at any time. Use `subagent_type: general-purpose`, `model: haiku`. Use the Digest
    Prompt below. If a Task call fails, retry it ONCE; if it fails again, add the sessionId
    to a `missedSessions` list — never silently omit it.
 
 5. **Premerge.** Run `node $SKILL_DIR/scripts/collect.mjs premerge <range>`.
    If `invalidDigests` is non-empty, re-digest those (once, batch ≤ 4), then re-run premerge.
+   If any digest is STILL invalid after that one retry, stop retrying — remove it from consideration and add its sessionId to the missedSessions list (it will be named in the report footer). Parse premerge's stdout as JSON, like step 2.
 
 6. **REDUCE.** Let `reportPath = <manifest.dataDir>/reports/<label>.report.json`.
    If `reportPath` exists AND its `inputHash` equals premerge's `inputHash` AND its
@@ -49,7 +49,7 @@ containing this file.
    Print its stdout (the terminal recap) to the user VERBATIM.
 
 8. **Open.** Read `open` from `<dataDir>/config.json` (`always` | `never` | `weekly-only`;
-   default `always`). If opening: macOS → `open <html>`; Linux → `xdg-open <html>`;
+   default `always`; `weekly-only` means auto-open only when the range argument was `week` or `lastweek`). If opening: macOS → `open <html>`; Linux → `xdg-open <html>`;
    WSL (`grep -qi microsoft /proc/version`) → `explorer.exe "$(wslpath -w <html>)"`.
    Failure is non-fatal — the path is already in the recap.
 
@@ -65,8 +65,7 @@ containing this file.
 > of cwd), "branch" (gitBranch), "firstTs", "lastTs", "items": [ { "claim": <what was worked on>,
 > "outcome": <ONE sentence, external standup framing — no internal noise, no credentials,
 > config values, or hostnames>, "detail": <mechanism / root cause / how it was fixed>,
-> "evidence": { "files": [paths], "commands": [key commands], "error_excerpt": <VERBATIM error
-> text from the pack — never paraphrase>, "commit_shas": [], "pr_links": [from prLinks] } } ],
+> "evidence": { "files": [paths], "commands": [key commands], "error_excerpt": VERBATIM error text from the pack, at most the first 300 characters — append ' …(truncated)' if cut. Verbatim means never paraphrase what you include; truncation is allowed, rewording is not., "commit_shas": [], "pr_links": [from prLinks] } } ],
 > "loose_ends": [<unfinished work, with file paths>], "findings": [<reusable discoveries>] }`
 >
 > Rules: every fact must come from the pack — never invent. Quote file paths and error text

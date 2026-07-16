@@ -13,4 +13,7 @@ test('SKILL.md has required frontmatter and orchestration guardrails', () => {
   assert.ok(s.includes('packsToDigest > 15'));        // cold-run confirmation
   assert.ok(s.includes('promptVersion'));             // reduce cache key
   assert.ok(s.toLowerCase().includes('verbatim'));    // anti-slop rule
+  assert.ok(s.includes('STILL invalid after that one retry'));
+  assert.ok(s.includes('first 300 characters'));
+  assert.ok(s.includes('If the user declines, STOP'));
 });
