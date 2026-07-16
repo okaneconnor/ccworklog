@@ -5,14 +5,6 @@ function git(args, cwd) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-// git --author matches an unanchored regex against "Name <email>", so raw
-// metacharacters (e.g. the dots in an email) can over-match unrelated
-// authors. Escape them, and for an email anchor the match to the angle
-// brackets it's wrapped in so only that exact address can match.
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 export function collectGitEvidence(cwds, { sinceISO, untilISO }) {
   const repos = new Set();
   for (const cwd of cwds) {
@@ -25,12 +17,12 @@ export function collectGitEvidence(cwds, { sinceISO, untilISO }) {
     let authorPattern = '';
     try {
       author = git(['config', 'user.email'], repo);
-      if (author) authorPattern = `<${escapeRegex(author)}>`;
+      if (author) authorPattern = `<${author}>`;
     } catch { /* unset */ }
     if (!author) {
       try {
         author = git(['config', 'user.name'], repo);
-        if (author) authorPattern = escapeRegex(author);
+        if (author) authorPattern = author;
       } catch { /* unset */ }
     }
     if (!author) continue;
@@ -45,7 +37,10 @@ export function collectGitEvidence(cwds, { sinceISO, untilISO }) {
         // exists in git, so --until keeps its normal (walk-stopping)
         // semantics; that's fine since we only ever supply an upper bound
         // to filter recent history, not to search back through it.
-        'log', '--all', '--no-merges', `--author=${authorPattern}`,
+        // --since-as-filter requires git >= 2.37 (2022-06).
+        // --fixed-strings treats --author as a literal substring, not regex,
+        // so email addresses with + signs (me+tag@example.com) match correctly.
+        'log', '--all', '--no-merges', '--fixed-strings', `--author=${authorPattern}`,
         `--since-as-filter=${sinceISO}`, `--until=${untilISO}`,
         '--date=iso-strict', '--pretty=%h%x09%ad%x09%s',
       ], repo);

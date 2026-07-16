@@ -89,3 +89,19 @@ test('--author escapes regex metacharacters and anchors the email', () => {
   assert.ok(subjects.includes('commit by dotted email'));
   assert.ok(!subjects.includes('commit by X email'));
 });
+
+test('--fixed-strings matches plus-tagged emails exactly', () => {
+  const { dir, g } = repo('me+tag@example.com');
+  writeFileSync(join(dir, 'tagged.txt'), 'tagged');
+  g('add', '.');
+  g('commit', '-q', '-m', 'commit by tagged email');
+  g('config', 'user.email', 'me@example.com');
+  writeFileSync(join(dir, 'untagged.txt'), 'untagged');
+  g('add', '.');
+  g('commit', '-q', '-m', 'commit by untagged email');
+  g('config', 'user.email', 'me+tag@example.com');
+  const out = collectGitEvidence([dir], WIDE);
+  const subjects = out[0].commits.map((c) => c.subject);
+  assert.ok(subjects.includes('commit by tagged email'));
+  assert.ok(!subjects.includes('commit by untagged email'));
+});
