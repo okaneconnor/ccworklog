@@ -99,3 +99,15 @@ test('readConfig returns {} when missing, parses when present', () => {
   writeFileSync(join(base, 'config.json'), '{"open":"never"}');
   assert.equal(readConfig(base).open, 'never');
 });
+
+test('premerge excludes digests that fail validation', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
+  const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });
+  writeJson(join(base, 'digests', 'ok-2026-07-15.json'),
+    { day: '2026-07-15', project: 'infra', branch: 'main', items: [{ claim: 'a', outcome: 'a', evidence: { files: ['f'] } }] });
+  writeJson(join(base, 'digests', 'bad-2026-07-15.json'),
+    { day: '2026-07-15', project: 'infra', branch: 'main' }); // items[] missing → invalid
+  const r = premerge(base, ['2026-07-15']);
+  const all = r.workstreams.flatMap((w) => w.digests);
+  assert.equal(all.length, 1);
+});

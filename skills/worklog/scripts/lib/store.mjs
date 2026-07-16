@@ -60,7 +60,10 @@ export function premerge(base, days) {
     if (!f.endsWith('.json')) continue;
     try {
       const d = JSON.parse(readFileSync(join(dir, f), 'utf8'));
-      if (wanted.has(d.day)) digests.push(d);
+      if (wanted.has(d.day)) {
+        const v = validateDigest(d);
+        if (v.ok) digests.push(d);
+      }
     } catch { /* corrupt digest — skipped; re-digest will replace it */ }
   }
   const groups = new Map();
