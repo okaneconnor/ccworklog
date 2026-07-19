@@ -1,5 +1,5 @@
-import { statSync, mkdirSync, existsSync, readdirSync, rmSync, readFileSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { mkdirSync, existsSync, readdirSync, rmSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { resolveRange } from './lib/dates.mjs';
 import { resolveClaudeRoot, discoverTranscripts } from './lib/discover.mjs';
 import { parseSession } from './lib/parse.mjs';
@@ -26,7 +26,7 @@ const out =
 process.stdout.write(JSON.stringify(out, null, 1) + '\n');
 
 function excluded(cwd) {
-  return (config.exclude_repos ?? []).some((p) => cwd && cwd.startsWith(p));
+  return (config.exclude_repos ?? []).some((p) => cwd && (p === cwd || cwd.startsWith(p + '/')));
 }
 
 function collect() {
@@ -65,6 +65,7 @@ function collect() {
     }
   }
   const git = collectGitEvidence([...cwds], range).filter((g) => !excluded(g.repo));
+  writeJson(join(base, 'reports', `${range.label}.git.json`), git);
   packs.sort((a, b) => b.day.localeCompare(a.day)); // newest first for backfill UX
   return {
     label: range.label, days: range.days, sinceISO: range.sinceISO, untilISO: range.untilISO,
@@ -88,9 +89,11 @@ function doPremerge() {
     if (!v.ok) invalidDigests.push({ digestPath: p, errors: v.errors });
     else writeJson(p, d); // persist low_confidence flags added by validation
   }
-  const { workstreams, inputHash } = premerge(base, range.days);
+  let git = null;
+  try { git = JSON.parse(readFileSync(join(base, 'reports', `${range.label}.git.json`), 'utf8')); } catch { git = null; }
+  const { workstreams, inputHash } = premerge(base, range.days, git);
   const reduceInputPath = join(base, 'reports', `${range.label}.reduce-input.json`);
-  writeJson(reduceInputPath, { label: range.label, days: range.days, inputHash, workstreams });
+  writeJson(reduceInputPath, { label: range.label, days: range.days, inputHash, workstreams, git });
   return { reduceInputPath, inputHash, invalidDigests };
 }
 
@@ -105,8 +108,31 @@ function purge() {
     }
   }
   const repDir = join(base, 'reports');
-  for (const f of existsSync(repDir) ? readdirSync(repDir) : []) {
-    if (f.startsWith(range.label)) { rmSync(join(repDir, f)); removed.push(join(repDir, f)); }
+  const wanted = new Set(range.days);
+  const stems = new Set(
+    (existsSync(repDir) ? readdirSync(repDir) : [])
+      .map((f) => f.replace(/\.(html|standup\.md|report\.json|reduce-input\.json|git\.json)$/, ''))
+  );
+  for (const stem of stems) {
+    if (stemDays(repDir, stem).some((d) => wanted.has(d))) {
+      for (const ext of ['html', 'standup.md', 'report.json', 'reduce-input.json', 'git.json']) {
+        const p = join(repDir, `${stem}.${ext}`);
+        if (existsSync(p)) { rmSync(p); removed.push(p); }
+      }
+    }
   }
   return { removed };
+}
+
+// A report stem's day coverage: read it from the report/reduce-input JSON so
+// overlapping ranges (e.g. purging one day inside a week report) are caught;
+// fall back to treating the stem itself as the label when neither exists.
+function stemDays(repDir, stem) {
+  for (const src of [`${stem}.report.json`, `${stem}.reduce-input.json`]) {
+    try {
+      const d = JSON.parse(readFileSync(join(repDir, src), 'utf8'));
+      if (Array.isArray(d.days) && d.days.length) return d.days;
+    } catch { /* try next source */ }
+  }
+  try { return resolveRange(stem).days; } catch { return stem.startsWith(range.label) ? [...range.days] : []; }
 }

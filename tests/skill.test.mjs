@@ -18,3 +18,15 @@ test('SKILL.md has required frontmatter and orchestration guardrails', () => {
   assert.ok(s.includes('If the user declines, STOP'));
   assert.ok(s.includes('SIZE IS A BINDING CONSTRAINT'));
 });
+
+test('SKILL.md carries the final-review wave guardrails', () => {
+  const s = readFileSync('skills/worklog/SKILL.md', 'utf8');
+  assert.ok(s.includes('--update-threads'));                     // threads ledger guard
+  assert.ok(s.includes('ONLY when step 6 actually ran REDUCE')); // flag only on cache miss / --fresh
+  assert.ok(s.includes('NOT use `manifest.git`'));               // git comes from reduce-input
+  assert.ok(s.includes('"promptVersion": "v1"'));                // schema inlined…
+  assert.ok(s.includes('"alsoShipped"'));
+  assert.ok(s.includes('"missedSessions"'));
+  assert.ok(!s.includes('docs/superpowers/plans'));              // …not referenced externally
+  assert.ok(s.includes('ONE human-readable sentence'));          // parseHealth shape rule
+});

@@ -84,6 +84,19 @@ test('stderr warnings on successful commands are not tool errors', () => {
   assert.equal(errs[0].line, 'Error: real failure without exit code');
 });
 
+test('string-valued toolUseResult is classified as tool_error only when it starts with Error', () => {
+  const { entries } = session([
+    { type: 'user', timestamp: T, message: { content: [{ type: 'tool_result', content: 'x' }] },
+      toolUseResult: 'Error: Exit code 1 | ls: /x: Operation not permitted' },
+    { type: 'user', timestamp: T, message: { content: [{ type: 'tool_result', content: 'x' }] },
+      toolUseResult: 'file contents here' },
+  ]);
+  const errs = entries.filter((e) => e.kind === 'tool_error');
+  assert.equal(errs.length, 1);
+  assert.equal(errs[0].line, 'Error: Exit code 1 | ls: /x: Operation not permitted');
+  assert.equal(errs[0].exitCode, null);
+});
+
 test('isMeta entries are fully dropped — no meta capture, no tool_error', () => {
   const { meta, entries } = session([
     { type: 'user', timestamp: T, isMeta: true, cwd: '/meta/cwd', gitBranch: 'meta-branch',

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -89,10 +89,48 @@ test('premerge validates digests and writes reduce-input', async () => {
   assert.equal(pm.inputHash.length, 16);
 });
 
+test('collect writes <label>.git.json; premerge folds it into reduce-input.json', () => {
+  const env = fixtureEnv();
+  const m = run(['collect', '2026-07-15'], env);
+  const gitJsonPath = join(env.CCWORKLOG_DATA_DIR, 'reports', '2026-07-15.git.json');
+  assert.ok(existsSync(gitJsonPath));
+  assert.deepEqual(JSON.parse(readFileSync(gitJsonPath, 'utf8')), m.git);
+
+  const p1 = m.packs.find((p) => p.sessionId === 'sess-1');
+  const digest = {
+    _key: JSON.parse(readFileSync(p1.packPath, 'utf8'))._digestKey,
+    sessionId: 'sess-1', day: '2026-07-15', project: 'repo-alpha', branch: 'feat/PLAT-7', firstTs: T('09'),
+    items: [{ claim: 'fixed cycle', outcome: 'Resolved terraform cycle in repo-alpha', evidence: { files: ['/repo/main.tf'] } }],
+    loose_ends: [], findings: [],
+  };
+  writeFileSync(p1.digestPath, JSON.stringify(digest));
+  const pm = run(['premerge', '2026-07-15'], env);
+  const ri = JSON.parse(readFileSync(pm.reduceInputPath, 'utf8'));
+  assert.ok('git' in ri);
+  assert.deepEqual(ri.git, m.git);
+});
+
 test('purge removes range artifacts', () => {
   const env = fixtureEnv();
   const m = run(['collect', '2026-07-15'], env);
   const out = run(['purge', '2026-07-15'], env);
   assert.ok(out.removed.length >= 1);
   assert.equal(existsSync(m.packs[0].packPath), false);
+});
+
+test('purge removes overlapping-range reports and spares unrelated days', () => {
+  const env = fixtureEnv();
+  run(['collect', '2026-07-15'], env);
+  const repDir = join(env.CCWORKLOG_DATA_DIR, 'reports');
+  mkdirSync(repDir, { recursive: true });
+  writeFileSync(join(repDir, 'week-of-2026-07-13.reduce-input.json'),
+    JSON.stringify({ days: ['2026-07-14', '2026-07-15', '2026-07-16'] }));
+  writeFileSync(join(repDir, 'week-of-2026-07-13.html'), '<!doctype html>');
+  writeFileSync(join(repDir, '2026-07-01.report.json'),
+    JSON.stringify({ days: ['2026-07-01'] }));
+  const out = run(['purge', '2026-07-15'], env);
+  assert.equal(existsSync(join(repDir, 'week-of-2026-07-13.html')), false);
+  assert.equal(existsSync(join(repDir, 'week-of-2026-07-13.reduce-input.json')), false);
+  assert.equal(existsSync(join(repDir, '2026-07-01.report.json')), true);
+  assert.ok(out.removed.some((p) => p.includes('week-of-2026-07-13')));
 });

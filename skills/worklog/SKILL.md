@@ -42,10 +42,14 @@ containing this file.
 6. **REDUCE.** Let `reportPath = <manifest.dataDir>/reports/<label>.report.json`.
    If `reportPath` exists AND its `inputHash` equals premerge's `inputHash` AND its
    `promptVersion` is `"v1"` AND `--fresh` was not passed → skip to step 7 (cached).
-   Otherwise: read the reduce-input file, `<dataDir>/threads.json`, and `manifest.git`,
+   Otherwise: read the reduce-input file (its `git` field carries the git evidence — do
+   NOT use `manifest.git`, which does not affect the cache key) and `<dataDir>/threads.json`,
    then write `reportPath` following the Reduce Rules below.
 
-7. **RENDER.** Run `node $SKILL_DIR/scripts/render.mjs <reportPath>`.
+7. **RENDER.** Run `node $SKILL_DIR/scripts/render.mjs <reportPath>` — pass `--update-threads`
+   ONLY when step 6 actually ran REDUCE this invocation (cache miss or `--fresh` was passed);
+   on a cache hit, render WITHOUT the flag so re-rendering an old cached report can never
+   clobber the live `threads.json` ledger with a stale snapshot.
    Print its stdout (the terminal recap) to the user VERBATIM.
 
 8. **Open.** Read `open` from `<dataDir>/config.json` (`always` | `never` | `weekly-only`;
@@ -58,7 +62,8 @@ containing this file.
 > SIZE IS A BINDING CONSTRAINT: total digest JSON under 2000 characters (hard reject over 4096). For busy sessions: at most 4-5 items, one-sentence details, at most 2 file paths per evidence block. Cut detail before cutting items.
 >
 > Read the JSON file {PACK_PATH} — an evidence pack from one Claude Code session on one day
-> (fields: prompts, files, commands, errors, assistant, title, gitBranch, prLinks, _digestKey).
+> (fields: prompts, files, commands, errors, assistant, title, cwd, gitBranch, prLinks,
+> sessionId, day, firstTs, lastTs, _digestKey).
 > Write a digest JSON to {DIGEST_PATH} using the Write tool, then reply with exactly one line:
 > `ok {DIGEST_PATH}`.
 >
@@ -87,8 +92,26 @@ containing this file.
   this range's digests or commits plausibly resolve it (say why in `lastState`); append new
   threads from digest `loose_ends` as `{ id: "t-<next>", firstSeen: <day> }`.
 - `timeline`: one row per day in the range (projects touched, `empty` flag).
-- `footer.parseHealth` from manifest parse health; `footer.missedSessions` from step 4/5
-  failures, with the sessions NAMED.
+- `footer.parseHealth` from manifest parse health — it must be ONE human-readable sentence
+  (not an object); `footer.missedSessions` from step 4/5 failures, with the sessions NAMED.
 - Deterministic ordering: workstreams alphabetically, days ascending.
-- Write the file with premerge's `inputHash` and `"promptVersion": "v1"`, matching the
-  report.json schema in `docs/superpowers/plans/2026-07-15-ccworklog-v1.md` Task 10.
+- Write the file with premerge's `inputHash` and `"promptVersion": "v1"`, matching this
+  report.json schema exactly:
+
+```json
+{
+  "label": "2026-07-15",
+  "days": ["2026-07-15"],
+  "inputHash": "abc123def4567890",
+  "promptVersion": "v1",
+  "standup": [{ "workstream": "PLAT-42", "project": "infra", "outcomes": ["…"] }],
+  "personal": [{
+    "workstream": "PLAT-42", "narrative": "started X, hit Y, resolved via Z",
+    "items": [{ "claim": "…", "detail": "…", "evidence": { "files": [], "commands": [], "error_excerpt": "", "commit_shas": [], "pr_links": [] }, "low_confidence": false }]
+  }],
+  "alsoShipped": [{ "repo": "/path", "summary": "…", "commits": ["ab12cd Subject line"] }],
+  "threads": { "open": [{ "id": "t-1", "text": "…", "repo": "", "firstSeen": "2026-07-14", "lastState": "…" }], "resolved": ["…"] },
+  "timeline": [{ "day": "2026-07-15", "projects": ["infra"], "empty": false }],
+  "footer": { "parseHealth": "skipped 3 lines; unknown types: none", "missedSessions": [] }
+}
+```

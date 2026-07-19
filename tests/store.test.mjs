@@ -92,6 +92,19 @@ test('cross-project same-ticket digests merge with projects/tickets unioned', ()
   assert.deepEqual(w.tickets, ['PLAT-9']);
 });
 
+test('premerge inputHash changes when git evidence differs but digests are identical', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
+  const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });
+  writeJson(join(base, 'digests', 's1-2026-07-15.json'),
+    { day: '2026-07-15', project: 'infra', branch: 'main', items: [{ claim: 'a', outcome: 'a', evidence: { files: ['f'] } }] });
+  const noGit = premerge(base, ['2026-07-15'], null);
+  const withGit = premerge(base, ['2026-07-15'], [{ repo: '/r', author: 'me', commits: [{ sha: 'abc123', subject: 'fix' }] }]);
+  const sameGitAgain = premerge(base, ['2026-07-15'], [{ repo: '/r', author: 'me', commits: [{ sha: 'abc123', subject: 'fix' }] }]);
+  assert.notEqual(noGit.inputHash, withGit.inputHash);
+  assert.equal(withGit.inputHash, sameGitAgain.inputHash); // deterministic for same git
+  assert.deepEqual(noGit.workstreams, withGit.workstreams); // workstreams themselves unaffected
+});
+
 test('readConfig returns {} when missing, parses when present', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'ccwd-'));
   const base = dataDir({ CCWORKLOG_DATA_DIR: join(tmp, 'ccw') });

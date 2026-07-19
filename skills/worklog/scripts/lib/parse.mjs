@@ -59,6 +59,9 @@ function ingest(e, meta, entries) {
         const first = String(r.stderr || r.stdout || '').split('\n').find((l) => l.trim()) ?? '';
         entries.push({ kind: 'tool_error', ts: e.timestamp ?? null, exitCode: r.exitCode ?? null, line: first.slice(0, 400) });
       }
+    } else if (typeof r === 'string' && /^Error\b/i.test(r)) {
+      const first = r.split('\n').find((l) => l.trim()) ?? '';
+      entries.push({ kind: 'tool_error', ts: e.timestamp ?? null, exitCode: null, line: first.slice(0, 400) });
     }
     let text = promptText(e.message?.content);
     if (text == null) return;

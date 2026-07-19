@@ -52,7 +52,7 @@ export function validateDigest(d) {
   return { ok: errors.length === 0, errors };
 }
 
-export function premerge(base, days) {
+export function premerge(base, days, git = null) {
   const dir = join(base, 'digests');
   const wanted = new Set(days);
   const digests = [];
@@ -97,6 +97,6 @@ export function premerge(base, days) {
       return aTs < bTs ? -1 : aTs > bTs ? 1 : 0;
     });
   }
-  const inputHash = createHash('sha256').update(JSON.stringify(workstreams)).digest('hex').slice(0, 16);
+  const inputHash = createHash('sha256').update(JSON.stringify({ workstreams, git })).digest('hex').slice(0, 16);
   return { workstreams, inputHash };
 }
