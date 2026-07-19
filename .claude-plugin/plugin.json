@@ -1,0 +1,6 @@
+{
+  "name": "ccworklog",
+  "version": "0.1.0",
+  "description": "Daily/weekly work-summary reports from your Claude Code sessions and git activity. 100% local, no API key, no network — Claude Code deletes your transcripts after 30 days; ccworklog remembers.",
+  "author": { "name": "Connor O'Kane" }
+}
