@@ -44,6 +44,15 @@ report.threads = {
 report.footer = (report.footer && typeof report.footer === 'object' && !Array.isArray(report.footer))
   ? report.footer : {};
 
+// The activity appendix is deterministic data built by collect.mjs premerge
+// from the (already-redacted) evidence packs. It rides in the sibling
+// reduce-input file, never through the model — read it here so the report's
+// appendix and day-rail cannot be garbled or invented.
+try {
+  const ri = JSON.parse(readFileSync(join(reportsDir, `${stem}.reduce-input.json`), 'utf8'));
+  report.activity = (ri.activity && Array.isArray(ri.activity.sessions)) ? ri.activity : { sessions: [] };
+} catch { report.activity = { sessions: [] }; }
+
 // Final-render redaction boundary: applied to the entire serialized report.
 const safe = JSON.parse(redact(JSON.stringify(report)).text);
 

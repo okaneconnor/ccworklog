@@ -6,8 +6,8 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 
 export const SCHEMA_VERSION = 1;
-export const DIGEST_TARGET = 2000;
-export const DIGEST_MAX = 4096;
+export const DIGEST_TARGET = 3000;
+export const DIGEST_MAX = 6000;
 const TICKET_RE = /\b([A-Z][A-Z0-9]{1,9}-\d+)\b/g;
 
 export function dataDir(env = process.env) {

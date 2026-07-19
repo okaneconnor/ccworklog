@@ -59,7 +59,7 @@ containing this file.
 
 ## Digest Prompt (per pack — substitute {PACK_PATH}, {DIGEST_PATH})
 
-> SIZE IS A BINDING CONSTRAINT: total digest JSON under 2000 characters (hard reject over 4096). For busy sessions: at most 4-5 items, one-sentence details, at most 2 file paths per evidence block. Cut detail before cutting items.
+> SIZE IS A BINDING CONSTRAINT: total digest JSON under 3000 characters (hard reject over 6000). For busy sessions: up to 8 items, one-sentence details, at most 2 file paths per evidence block. Cut detail before cutting items.
 >
 > Read the JSON file {PACK_PATH} — an evidence pack from one Claude Code session on one day
 > (fields: prompts, files, commands, errors, assistant, title, cwd, gitBranch, prLinks,
@@ -77,7 +77,7 @@ containing this file.
 >
 > Rules: every fact must come from the pack — never invent. Quote file paths and error text
 > verbatim. If the pack has an elision note, add `"coverage": "partial"`. Keep the JSON under
-> 2000 characters (hard limit 4096). 3–6 items for a busy session; 1 is fine for a small one.
+> 3000 characters (hard limit 6000). Up to 8 items for a busy session; 1 is fine for a small one.
 
 ## Reduce Rules
 
@@ -86,8 +86,12 @@ containing this file.
   ("started X, hit Y, resolved via Z") — never a flat per-session list.
 - `standup[].outcomes` come ONLY from digest `outcome` fields. Copy `evidence` objects
   through UNTOUCHED into `personal[].items`.
-- Fold git commits into their workstream (match repo/branch); leftovers → `alsoShipped`,
-  grouped by repo, commit subjects summarized together.
+- Fold git commits into their workstream (match repo/branch): set `personal[].commits` to the
+  matched commits as `"<short-sha> <subject>"` strings (chronological, cap 30, then one
+  `"+N more"` entry). Leftovers → `alsoShipped`, grouped by repo, commit subjects summarized
+  together.
+- Do NOT copy the reduce-input's `activity` object into report.json — render.mjs reads it
+  from the reduce-input file directly (deterministic appendix; not model territory).
 - Threads: carry forward every open thread from `threads.json`; mark one resolved ONLY when
   this range's digests or commits plausibly resolve it (say why in `lastState`); append new
   threads from digest `loose_ends` as `{ id: "t-<next>", firstSeen: <day> }`.
@@ -107,6 +111,7 @@ containing this file.
   "standup": [{ "workstream": "PLAT-42", "project": "infra", "outcomes": ["…"] }],
   "personal": [{
     "workstream": "PLAT-42", "narrative": "started X, hit Y, resolved via Z",
+    "commits": ["ab12cd Subject line", "+3 more"],
     "items": [{ "claim": "…", "detail": "…", "evidence": { "files": [], "commands": [], "error_excerpt": "", "commit_shas": [], "pr_links": [] }, "low_confidence": false }]
   }],
   "alsoShipped": [{ "repo": "/path", "summary": "…", "commits": ["ab12cd Subject line"] }],

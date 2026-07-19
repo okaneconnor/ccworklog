@@ -93,8 +93,36 @@ function doPremerge() {
   try { git = JSON.parse(readFileSync(join(base, 'reports', `${range.label}.git.json`), 'utf8')); } catch { git = null; }
   const { workstreams, inputHash } = premerge(base, range.days, git);
   const reduceInputPath = join(base, 'reports', `${range.label}.reduce-input.json`);
-  writeJson(reduceInputPath, { label: range.label, days: range.days, inputHash, workstreams, git });
+  writeJson(reduceInputPath, {
+    label: range.label, days: range.days, inputHash, workstreams, git,
+    activity: buildActivity(),
+  });
   return { reduceInputPath, inputHash, invalidDigests };
+}
+
+// Deterministic per-session activity for the report's appendix and day-rail,
+// read straight from the (already-redacted) evidence packs — the model never
+// touches this data: render.mjs pulls it from the reduce-input file directly.
+function buildActivity() {
+  const sessions = [];
+  for (const day of range.days) {
+    const dayDir = join(base, 'evidence', day);
+    for (const f of existsSync(dayDir) ? readdirSync(dayDir).sort() : []) {
+      if (!f.endsWith('.json')) continue;
+      try {
+        const pack = JSON.parse(readFileSync(join(dayDir, f), 'utf8'));
+        sessions.push({
+          sessionId: pack.sessionId, day, title: pack.title ?? null,
+          firstTs: pack.firstTs ?? null, lastTs: pack.lastTs ?? null,
+          files: (pack.files ?? []).slice(0, 40),
+          commands: (pack.commands ?? []).slice(0, 40),
+          promptCount: (pack.prompts ?? []).length,
+          elided: pack.elided === true,
+        });
+      } catch { /* unreadable pack — skip from appendix */ }
+    }
+  }
+  return { sessions };
 }
 
 function purge() {

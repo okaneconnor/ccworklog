@@ -31,7 +31,7 @@ test('digest cache invalidates when transcript grows', () => {
 test('validateDigest enforces shape, size, and anchors', () => {
   assert.equal(validateDigest(null).ok, false);
   assert.equal(validateDigest({ items: 'nope' }).ok, false);
-  const big = { items: [{ claim: 'c', outcome: 'o', evidence: { files: ['x'.repeat(5000)] } }] };
+  const big = { items: [{ claim: 'c', outcome: 'o', evidence: { files: ['x'.repeat(7000)] } }] };
   assert.equal(validateDigest(big).ok, false);
   const good = {
     items: [

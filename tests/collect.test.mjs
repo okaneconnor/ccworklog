@@ -134,3 +134,15 @@ test('purge removes overlapping-range reports and spares unrelated days', () => 
   assert.equal(existsSync(join(repDir, '2026-07-01.report.json')), true);
   assert.ok(out.removed.some((p) => p.includes('week-of-2026-07-13')));
 });
+
+test('premerge reduce-input carries deterministic activity from evidence packs', () => {
+  const env = fixtureEnv();
+  run(['collect', '2026-07-15'], env);
+  const pm = run(['premerge', '2026-07-15'], env);
+  const ri = JSON.parse(readFileSync(pm.reduceInputPath, 'utf8'));
+  assert.ok(Array.isArray(ri.activity.sessions));
+  const s1 = ri.activity.sessions.find((s) => s.sessionId === 'sess-1');
+  assert.equal(s1.title, 'Fix terraform cycle');
+  assert.equal(s1.promptCount, 2);
+  assert.ok(s1.files.includes('/repo/main.tf'));
+});
