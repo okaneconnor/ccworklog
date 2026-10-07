@@ -136,3 +136,26 @@ test('html and standup.md are chmod 600', () => {
   assert.equal(statSync(join(dataDirPath, 'reports', '2026-07-15.html')).mode & 0o777, 0o600);
   assert.equal(statSync(join(dataDirPath, 'reports', '2026-07-15.standup.md')).mode & 0o777, 0o600);
 });
+
+test('view.json carries the redacted report, the html path and the standup for the pane', () => {
+  const { dataDirPath } = setup();
+  const viewPath = join(dataDirPath, 'reports', '2026-07-15.view.json');
+  const view = JSON.parse(readFileSync(viewPath, 'utf8'));
+  assert.equal(view.label, '2026-07-15');
+  assert.ok(view.htmlPath.endsWith('2026-07-15.html'));
+  assert.ok(view.standupMd.includes('Automated gluetun port sync'));
+  assert.ok(Array.isArray(view.activity.sessions));
+  assert.ok(!JSON.stringify(view).includes('ghp_abcdefghijklmnopqrstuvwxyz012345'));
+  assert.equal(statSync(viewPath).mode & 0o777, 0o600);
+});
+
+test('standup.md groups outcomes under each workstream and drops an empty branch', () => {
+  const dataDirPath = mkdtempSync(join(tmpdir(), 'ccwr-'));
+  mkdirSync(join(dataDirPath, 'reports'), { recursive: true });
+  const reportPath = join(dataDirPath, 'reports', '2026-07-15.report.json');
+  writeFileSync(reportPath, JSON.stringify({ ...REPORT, standup: [{ workstream: 'homelab@HEAD', outcomes: ['One', 'Two'] }] }));
+  execFileSync('node', ['skills/worklog/scripts/render.mjs', reportPath], { encoding: 'utf8' });
+  const md = readFileSync(join(dataDirPath, 'reports', '2026-07-15.standup.md'), 'utf8');
+  assert.ok(md.includes('**homelab**\n- One\n- Two'));
+  assert.ok(!md.includes('@HEAD'));
+});

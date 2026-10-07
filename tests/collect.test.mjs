@@ -126,11 +126,13 @@ test('purge removes overlapping-range reports and spares unrelated days', () => 
   writeFileSync(join(repDir, 'week-of-2026-07-13.reduce-input.json'),
     JSON.stringify({ days: ['2026-07-14', '2026-07-15', '2026-07-16'] }));
   writeFileSync(join(repDir, 'week-of-2026-07-13.html'), '<!doctype html>');
+  writeFileSync(join(repDir, 'week-of-2026-07-13.view.json'), '{}');
   writeFileSync(join(repDir, '2026-07-01.report.json'),
     JSON.stringify({ days: ['2026-07-01'] }));
   const out = run(['purge', '2026-07-15'], env);
   assert.equal(existsSync(join(repDir, 'week-of-2026-07-13.html')), false);
   assert.equal(existsSync(join(repDir, 'week-of-2026-07-13.reduce-input.json')), false);
+  assert.equal(existsSync(join(repDir, 'week-of-2026-07-13.view.json')), false);
   assert.equal(existsSync(join(repDir, '2026-07-01.report.json')), true);
   assert.ok(out.removed.some((p) => p.includes('week-of-2026-07-13')));
 });
@@ -143,6 +145,7 @@ test('premerge reduce-input carries deterministic activity from evidence packs',
   assert.ok(Array.isArray(ri.activity.sessions));
   const s1 = ri.activity.sessions.find((s) => s.sessionId === 'sess-1');
   assert.equal(s1.title, 'Fix terraform cycle');
+  assert.equal(typeof s1.project, 'string');
   assert.equal(s1.promptCount, 2);
   assert.ok(s1.files.includes('/repo/main.tf'));
 });

@@ -1,5 +1,5 @@
 import { mkdirSync, existsSync, readdirSync, rmSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { resolveRange } from './lib/dates.mjs';
 import { resolveClaudeRoot, discoverTranscripts } from './lib/discover.mjs';
 import { parseSession } from './lib/parse.mjs';
@@ -113,6 +113,7 @@ function buildActivity() {
         const pack = JSON.parse(readFileSync(join(dayDir, f), 'utf8'));
         sessions.push({
           sessionId: pack.sessionId, day, title: pack.title ?? null,
+          project: pack.cwd ? basename(pack.cwd) : null,
           firstTs: pack.firstTs ?? null, lastTs: pack.lastTs ?? null,
           files: (pack.files ?? []).slice(0, 40),
           commands: (pack.commands ?? []).slice(0, 40),
@@ -139,11 +140,11 @@ function purge() {
   const wanted = new Set(range.days);
   const stems = new Set(
     (existsSync(repDir) ? readdirSync(repDir) : [])
-      .map((f) => f.replace(/\.(html|standup\.md|report\.json|reduce-input\.json|git\.json)$/, ''))
+      .map((f) => f.replace(/\.(html|standup\.md|report\.json|reduce-input\.json|git\.json|view\.json)$/, ''))
   );
   for (const stem of stems) {
     if (stemDays(repDir, stem).some((d) => wanted.has(d))) {
-      for (const ext of ['html', 'standup.md', 'report.json', 'reduce-input.json', 'git.json']) {
+      for (const ext of ['html', 'standup.md', 'report.json', 'reduce-input.json', 'git.json', 'view.json']) {
         const p = join(repDir, `${stem}.${ext}`);
         if (existsSync(p)) { rmSync(p); removed.push(p); }
       }

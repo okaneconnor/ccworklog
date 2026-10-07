@@ -56,9 +56,10 @@ try {
 // Final-render redaction boundary: applied to the entire serialized report.
 const safe = JSON.parse(redact(JSON.stringify(report)).text);
 
+const standupMd = buildStandupMd(safe);
 const template = readFileSync(new URL('../templates/report.html', import.meta.url), 'utf8');
 const html = template.replace('__CCWORKLOG_DATA__',
-  () => JSON.stringify(safe).replace(/</g, '\\u003c'));
+  () => JSON.stringify({ ...safe, standupMd }).replace(/</g, '\\u003c'));
 const htmlPath = join(reportsDir, `${stem}.html`);
 writeFileSync(htmlPath, html);
 try {
@@ -67,7 +68,6 @@ try {
   // ignore chmod failures
 }
 
-const standupMd = buildStandupMd(safe);
 const standupPath = join(reportsDir, `${stem}.standup.md`);
 writeFileSync(standupPath, standupMd);
 try {
@@ -75,6 +75,10 @@ try {
 } catch (err) {
   // ignore chmod failures
 }
+
+// The redacted report the mod's pane draws from, so the pane never shows what
+// the HTML's redaction boundary would have caught.
+writeJson(join(reportsDir, `${stem}.view.json`), { ...safe, htmlPath, standupMd });
 
 // threads.json is the live ledger of open threads. Only overwrite it when this
 // invocation actually ran REDUCE (cache miss or --fresh); re-rendering a cached
@@ -85,12 +89,21 @@ if (updateThreads) {
 
 process.stdout.write(buildRecap(safe, htmlPath));
 
+// "repo@HEAD" and "repo@-" say no more than "repo": drop the empty branch.
+function workstreamName(ws) {
+  return String(ws ?? '').replace(/@(HEAD|-)?$/, '');
+}
+
 function buildStandupMd(r) {
-  const lines = [`## Standup — ${r.label}`, ''];
+  const lines = [`## Standup — ${r.label}`];
   for (const s of r.standup ?? []) {
-    for (const o of s.outcomes ?? []) lines.push(`- **${s.workstream}**: ${o}`);
+    lines.push('', `**${workstreamName(s.workstream)}**`);
+    for (const o of s.outcomes ?? []) lines.push(`- ${o}`);
   }
-  for (const a of r.alsoShipped ?? []) lines.push(`- **${String(a.repo ?? '').split('/').pop()}**: ${a.summary}`);
+  if ((r.alsoShipped ?? []).length) {
+    lines.push('', '**Also shipped**');
+    for (const a of r.alsoShipped) lines.push(`- ${String(a.repo ?? '').split('/').pop()}: ${a.summary}`);
+  }
   const open = r.threads?.open ?? [];
   if (open.length) {
     lines.push('', '**Next:**');

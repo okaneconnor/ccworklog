@@ -1,6 +1,9 @@
 {
   "name": "ccworklog",
-  "version": "0.1.0",
-  "description": "Daily/weekly work-summary reports from your Claude Code sessions and git activity. 100% local, no API key, no network — Claude Code deletes your transcripts after 30 days; ccworklog remembers.",
-  "author": { "name": "Connor O'Kane" }
+  "version": "0.2.0",
+  "description": "A daily and weekly worklog built from your Claude Code sessions and git history: a pane beside the transcript, a readable report, and a standup you can paste. 100% local.",
+  "author": {
+    "name": "Connor O'Kane"
+  },
+  "types": "./types/index.d.ts"
 }
