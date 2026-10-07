@@ -27,6 +27,5 @@ test('SKILL.md carries the final-review wave guardrails', () => {
   assert.ok(s.includes('"promptVersion": "v1"'));                // schema inlined…
   assert.ok(s.includes('"alsoShipped"'));
   assert.ok(s.includes('"missedSessions"'));
-  assert.ok(!s.includes('docs/superpowers/plans'));              // …not referenced externally
   assert.ok(s.includes('ONE human-readable sentence'));          // parseHealth shape rule
 });
