@@ -1,0 +1,301 @@
+<!-- skills/worklog/templates/report.html -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worklog</title>
+<style>
+  /* Fully offline: system faces only, no fetches of any kind. */
+  :root {
+    --bg: #F3F4F7; --card: #FFFFFF; --ink: #171C28; --ink-2: #3D4456; --muted: #6A7286; --faint: #A3AABA;
+    --rule: #E6E8EE; --track: #EBEDF2; --chip: #F1F2F6;
+    --amber: #9A5F08; --amber-bg: #FBF1DD; --green: #2E8A5E; --red: #C2413B;
+    --shadow: 0 1px 2px rgba(23, 28, 40, 0.05), 0 4px 16px rgba(23, 28, 40, 0.04);
+    --round: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111419; --card: #191D25; --ink: #ECEEF3; --ink-2: #B9BFCC; --muted: #8C94A6; --faint: #596173;
+      --rule: #262B35; --track: #232834; --chip: #222733;
+      --amber: #E3A853; --amber-bg: #2A2316; --green: #5BC28E; --red: #EC6F67;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  main { max-width: 780px; margin: 0 auto; padding: 56px 20px 80px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+
+  /* The day: date, one plain sentence, then the ribbon. */
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { font: 700 clamp(30px, 6vw, 44px)/1.1 var(--round); letter-spacing: -0.02em; }
+  .summary { color: var(--muted); margin-top: 8px; }
+  .copy {
+    flex: none; font: 600 14px/1 var(--round); background: var(--card); box-shadow: var(--shadow);
+    border: 1px solid var(--rule); border-radius: 999px; padding: 10px 16px;
+  }
+  .copy:hover { border-color: var(--faint); }
+
+  .days { margin: 36px 0 10px; display: grid; gap: 10px; }
+  .day { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 12px; }
+  .day .label { font: 600 13px/1 var(--round); color: var(--muted); }
+  .days.single .day { grid-template-columns: 1fr; }
+  .days.single .label { display: none; }
+  .ribbon { position: relative; height: 30px; background: var(--track); border-radius: 9px; overflow: hidden; }
+  .ribbon .hour { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bg); opacity: 0.8; }
+  .ribbon .block {
+    position: absolute; top: 5px; bottom: 5px; border-radius: 5px; min-width: 4px;
+    transform-origin: left center; animation: draw 0.7s cubic-bezier(.2,.7,.2,1) both;
+  }
+  @keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .hours { position: relative; height: 14px; font: 12px/1 var(--round); color: var(--faint); }
+  .hours span { position: absolute; transform: translateX(-50%); }
+  .hours span:first-child { transform: none; }
+  .days:not(.single) + .hours { margin-left: 64px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 16px; font-size: 14px; color: var(--muted); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; flex: none; }
+
+  /* Sections hold cards; a card is one workstream or one list. */
+  section { margin-top: 48px; }
+  h2 { font: 700 21px/1.3 var(--round); letter-spacing: -0.01em; margin-bottom: 14px; }
+  h2 .count { color: var(--faint); font-weight: 600; margin-left: 6px; }
+  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 20px 22px; }
+  .card + .card { margin-top: 12px; }
+  .card-head { display: flex; align-items: center; font: 650 16px/1.4 var(--round); }
+  .card-head .n { margin-left: auto; font-weight: 500; color: var(--faint); font-size: 14px; }
+
+  .outcomes { list-style: none; margin-top: 10px; }
+  .outcomes li { display: grid; grid-template-columns: 22px 1fr; color: var(--ink-2); margin-top: 8px; max-width: 70ch; }
+  .outcomes .tick { font-weight: 700; line-height: 1.6; }
+
+  .threads { list-style: none; padding: 6px 22px; }
+  .threads li { display: grid; grid-template-columns: 50px 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid var(--rule); }
+  .threads li:first-child { border-top: 0; }
+  .age { font: 700 12px/1 var(--round); text-align: center; border-radius: 6px; padding: 5px 0; margin-top: 3px; height: fit-content; }
+  .age.new { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+  .age.warm { color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); }
+  .age.old { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); }
+  .threads .state { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .resolved { margin-top: 12px; color: var(--muted); font-size: 14px; }
+  .resolved s { text-decoration-color: var(--faint); }
+
+  /* The detail: a summary set apart, then entries along a timeline. */
+  details.card > summary { list-style: none; cursor: pointer; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary .card-head::after { content: "Show"; margin-left: 14px; font: 500 13px var(--round); color: var(--muted); }
+  details.card[open] > summary .card-head::after { content: "Hide"; }
+  .narrative {
+    margin-top: 14px; padding: 12px 16px; border-radius: 10px; background: var(--chip);
+    border-left: 3px solid var(--c); color: var(--ink-2); font-size: 15px; line-height: 1.65;
+  }
+  .narrative .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .narrative + .more { margin-left: 19px; }
+  code.inline { font: 0.88em var(--mono); background: var(--chip); border-radius: 4px; padding: 1px 5px; }
+  .entries { list-style: none; position: relative; margin-top: 18px; padding-left: 26px; }
+  .entries::before {
+    content: ""; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 2px; border-radius: 2px;
+    background: color-mix(in srgb, var(--c) 30%, transparent);
+  }
+  .entry { position: relative; padding-bottom: 20px; max-width: 68ch; }
+  .entry:last-child { padding-bottom: 4px; }
+  .entry::before {
+    content: ""; position: absolute; left: -25px; top: 6px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--card); border: 2.5px solid var(--c);
+  }
+  .entry h3 { font: 600 15.5px/1.45 var(--sans); }
+  .entry .tag { font: 500 12px/1 var(--round); color: var(--amber); background: var(--amber-bg); border-radius: 999px; padding: 3px 8px; margin-left: 8px; vertical-align: 2px; white-space: nowrap; }
+  .entry .detail { margin-top: 4px; color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+  .detail.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .more { margin-top: 2px; font: 500 13px var(--round); color: var(--muted); }
+  .more:hover { color: var(--ink); }
+  .files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .file { font: 12px/1 var(--mono); color: var(--muted); background: var(--chip); border-radius: 6px; padding: 5px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hit { display: flex; gap: 8px; margin-top: 8px; padding: 8px 12px; border-radius: 8px; background: var(--amber-bg); color: var(--amber); font-size: 13.5px; line-height: 1.5; }
+  .hit b { font-weight: 600; white-space: nowrap; }
+  .commits { list-style: none; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 14.5px; color: var(--ink-2); }
+  .commits li { margin-top: 4px; }
+  .commits code { font: 12.5px var(--mono); color: var(--muted); margin-right: 10px; }
+
+  footer { margin-top: 56px; color: var(--faint); font-size: 13px; }
+  .warn { color: var(--amber); }
+
+  @media (prefers-reduced-motion: reduce) { .ribbon .block { animation: none; } }
+  @media (max-width: 560px) {
+    main { padding-top: 32px; }
+    .top { flex-direction: column; }
+    .days:not(.single) + .hours { margin-left: 0; }
+    .card, .threads { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script id="data" type="application/json">__CCWORKLOG_DATA__</script>
+<script>
+const R = JSON.parse(document.getElementById('data').textContent);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const redacted = (s) => /\[REDACTED:/.test(String(s ?? ''));
+
+// The pane's palette, so a workstream keeps its color in the terminal and here.
+const PALETTE = ['#D97757', '#5B8DEF', '#3FB68B', '#B07FE0', '#E0B341', '#4CB8C4', '#E06C9F'];
+const NEUTRAL = '#7A8599';
+const wsName = (ws) => { const [p, b] = String(ws ?? '').split('@'); return !b || b === 'HEAD' || b === '-' ? p : `${p} · ${b}`; };
+const streams = [...new Set([...(R.personal || []).map((p) => p.workstream), ...(R.standup || []).map((s) => s.workstream)])];
+const colorOf = (ws) => { const i = streams.indexOf(ws); return i === -1 ? NEUTRAL : PALETTE[i % PALETTE.length]; };
+const projectColor = new Map();
+for (const ws of streams) {
+  const project = (R.standup || []).find((s) => s.workstream === ws)?.project ?? String(ws).split('@')[0];
+  if (!projectColor.has(project)) projectColor.set(project, colorOf(ws));
+}
+const acts = (R.activity && R.activity.sessions) || [];
+for (const s of acts) if (s.project && !projectColor.has(s.project)) projectColor.set(s.project, PALETTE[projectColor.size % PALETTE.length]);
+const dot = (color) => `<span class="dot" style="background:${color}"></span>`;
+// Backticked text in model prose reads as code.
+const fmt = (s) => esc(s).replace(/`([^`]+)`/g, '<code class="inline">$1</code>');
+const fileName = (p) => String(p).split('/').filter(Boolean).pop() || p;
+// An excerpt reads as what happened, not as a log line: no "Error:" lead, no truncation marker.
+const tidyError = (s) => String(s).replace(/^\s*Error:\s*/i, '').replace(/\s*…\(truncated\)\s*$/, '…');
+
+const days = R.days || [];
+const localDay = (day) => { const [y, m, d] = String(day).split('-').map(Number); return new Date(y, m - 1, d); };
+const minuteOf = (ts, day) => Math.min(1440, Math.max(0, (Date.parse(ts) - localDay(day).getTime()) / 60000));
+const minutes = acts.reduce((n, s) => n + (s.firstTs && s.lastTs ? minuteOf(s.lastTs, s.day) - minuteOf(s.firstTs, s.day) : 0), 0);
+const commits = [...(R.personal || []).flatMap((p) => p.commits || []), ...(R.alsoShipped || []).flatMap((a) => a.commits || [])]
+  .reduce((n, c) => { const m = String(c).match(/^\+(\d+) more$/); return n + (m ? Number(m[1]) : 1); }, 0);
+const focus = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m` : `${Math.round(minutes)} minutes`;
+const today = new Date(); today.setHours(0, 0, 0, 0);
+
+const html = [];
+
+/* The day */
+const title = days.length === 1
+  ? localDay(days[0]).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  : days.length > 1
+    ? `${localDay(days[0]).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} to ${localDay(days[days.length - 1]).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`
+    : R.label;
+html.push(`<div class="top"><div><h1>${esc(title)}</h1>
+  <p class="summary">${plural(acts.length, 'session')} and ${focus} of focus, ${commits === 0 ? 'no commits' : plural(commits, 'commit')}.</p></div>
+  <button class="copy" type="button" onclick="copyStandup(this)">Copy standup</button></div>`);
+
+// Zoom the ribbon to the hours actually worked (at least six), so a short
+// or late session reads as a shape, not a sliver on a 24-hour scale.
+const spans = acts.filter((s) => s.firstTs && s.lastTs).map((s) => [minuteOf(s.firstTs, s.day), minuteOf(s.lastTs, s.day)]);
+let winFrom = spans.length ? Math.floor(Math.min(...spans.map((x) => x[0])) / 60) * 60 : 0;
+let winTo = spans.length ? Math.ceil(Math.max(...spans.map((x) => x[1])) / 60) * 60 : 1440;
+if (winTo - winFrom < 360) { winTo = Math.min(1440, winFrom + 360); winFrom = Math.max(0, winTo - 360); }
+const span = winTo - winFrom;
+const at = (m) => ((m - winFrom) / span) * 100;
+const step = span <= 480 ? 60 : span <= 720 ? 120 : 180;
+const marks = [];
+for (let m = winFrom; m <= winTo; m += step) marks.push(m);
+const clock = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+html.push(`<div class="days${days.length === 1 ? ' single' : ''}">`);
+for (const day of days) {
+  const blocks = acts.filter((s) => s.day === day && s.firstTs && s.lastTs).map((s, i) => {
+    const from = minuteOf(s.firstTs, day), to = minuteOf(s.lastTs, day);
+    const label = `${s.title || s.sessionId}, ${clock(s.firstTs)} to ${clock(s.lastTs)}`;
+    return `<div class="block" title="${esc(label)}" style="left:${at(from).toFixed(2)}%;width:${Math.max(at(to) - at(from), 0.8).toFixed(2)}%;background:${projectColor.get(s.project) || NEUTRAL};animation-delay:${i * 80}ms"></div>`;
+  }).join('');
+  const lines = marks.filter((m) => m > winFrom && m < winTo).map((m) => `<div class="hour" style="left:${at(m)}%"></div>`).join('');
+  html.push(`<div class="day"><span class="label">${esc(localDay(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }))}</span><div class="ribbon">${lines}${blocks}</div></div>`);
+}
+const hh = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:00`;
+html.push(`</div><div class="hours">${marks.filter((m) => m < winTo).map((m) => `<span style="left:${at(m)}%">${hh(m)}</span>`).join('')}</div>`);
+if (projectColor.size) html.push(`<div class="legend">${[...projectColor].map(([p, c]) => `<span>${dot(c)}${esc(p)}</span>`).join('')}</div>`);
+
+/* What I did */
+const standup = R.standup || [];
+const shipped = R.alsoShipped || [];
+html.push('<section><h2>What I did</h2>');
+if (!standup.length && !shipped.length) html.push('<div class="card"><p class="summary">Nothing to report for this range.</p></div>');
+for (const s of standup) {
+  const c = colorOf(s.workstream);
+  html.push(`<div class="card"><div class="card-head">${dot(c)}${esc(wsName(s.workstream))}</div><ul class="outcomes">${(s.outcomes || []).map((o) => `<li><span class="tick" style="color:${c}">✓</span><span>${fmt(o)}</span></li>`).join('')}</ul></div>`);
+}
+if (shipped.length) {
+  html.push(`<div class="card"><div class="card-head">${dot(NEUTRAL)}Also shipped</div><ul class="outcomes">${shipped.map((a) => `<li><span class="tick" style="color:${NEUTRAL}">✓</span><span><b>${esc(String(a.repo ?? '').split('/').pop() || 'other')}</b> ${esc(a.summary)}</span></li>`).join('')}</ul></div>`);
+}
+html.push('</section>');
+
+/* Open threads */
+const open = (R.threads && R.threads.open) || [];
+const resolved = (R.threads && R.threads.resolved) || [];
+if (open.length || resolved.length) {
+  html.push(`<section><h2>Open threads${open.length ? `<span class="count">${open.length}</span>` : ''}</h2>`);
+  if (open.length) {
+    html.push('<ul class="card threads">');
+    for (const t of open) {
+      const age = t.firstSeen ? Math.max(0, Math.round((today - localDay(t.firstSeen)) / 86400000)) : 0;
+      const badge = age === 0 ? ['new', 'new'] : [`${age}d`, age <= 3 ? 'warm' : 'old'];
+      const repo = redacted(t.repo) ? '' : fileName(t.repo ?? '');
+      const where = [repo, t.lastState].filter(Boolean).map(fmt).join(', ');
+      html.push(`<li><span class="age ${badge[1]}">${badge[0]}</span><div>${fmt(t.text)}${where ? `<div class="state">${where}</div>` : ''}</div></li>`);
+    }
+    html.push('</ul>');
+  }
+  if (resolved.length) html.push(`<p class="resolved">Closed this range: ${resolved.map((r) => `<s>${esc(String(r).split(' — ')[0])}</s>`).join(', ')}</p>`);
+  html.push('</section>');
+}
+
+/* The detail */
+const personal = R.personal || [];
+if (personal.length) {
+  html.push('<section><h2>The detail</h2>');
+  personal.forEach((p, i) => {
+    const c = colorOf(p.workstream);
+    const items = p.items || [];
+    html.push(`<details class="card" style="--c:${c}"${i === 0 ? ' open' : ''}><summary><div class="card-head">${dot(c)}${esc(wsName(p.workstream))}<span class="n">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span></div></summary>`);
+    if (p.narrative) {
+      const isLong = p.narrative.length > 360;
+      html.push(`<div class="narrative"><p${isLong ? ' class="clamp"' : ''}>${fmt(p.narrative)}</p></div>`);
+      if (isLong) html.push('<button class="more" type="button" onclick="toggleMore(this)">Show more</button>');
+    }
+    html.push('<ol class="entries">');
+    for (const it of items) {
+      const ev = it.evidence || {};
+      const files = (ev.files || []).filter((f) => !redacted(f));
+      const isLong = String(it.detail || '').length > 260;
+      html.push(`<li class="entry"><h3>${fmt(it.claim)}${it.low_confidence ? '<span class="tag">no evidence</span>' : ''}</h3>`);
+      if (it.detail) html.push(`<p class="detail${isLong ? ' clamp' : ''}">${fmt(it.detail)}</p>`);
+      if (isLong) html.push('<button class="more" type="button" onclick="toggleMore(this)">Show more</button>');
+      if (files.length) html.push(`<div class="files">${files.map((f) => `<span class="file" title="${esc(f)}">${esc(fileName(f))}</span>`).join('')}</div>`);
+      if (ev.error_excerpt) html.push(`<div class="hit"><b>Hit along the way</b><span>${esc(tidyError(ev.error_excerpt))}</span></div>`);
+      html.push('</li>');
+    }
+    html.push('</ol>');
+    const list = p.commits || [];
+    if (list.length) {
+      html.push(`<ul class="commits">${list.map((c) => { const m = String(c).match(/^([0-9a-f]{6,10})\s+(.*)$/i); return m ? `<li><code>${esc(m[1])}</code>${esc(m[2])}</li>` : `<li>${esc(c)}</li>`; }).join('')}</ul>`);
+    }
+    html.push('</details>');
+  });
+  html.push('</section>');
+}
+
+/* Footer */
+const missed = (R.footer && R.footer.missedSessions) || [];
+html.push(`<footer>${missed.length ? `<p class="warn">${plural(missed.length, 'session')} could not be summarised: ${missed.map(esc).join(', ')}. Run /worklog again to fill the gap.</p>` : ''}<p>Made by ccworklog on this machine.</p></footer>`);
+
+document.getElementById('app').innerHTML = html.join('');
+
+function toggleMore(btn) {
+  const prev = btn.previousElementSibling;
+  const target = prev.classList.contains('narrative') ? prev.firstElementChild : prev;
+  target.classList.toggle('clamp');
+  btn.textContent = target.classList.contains('clamp') ? 'Show more' : 'Show less';
+}
+
+function copyStandup(btn) {
+  navigator.clipboard.writeText(R.standupMd || '')
+    .then(() => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy standup'; }, 1800); })
+    .catch(() => { btn.textContent = 'Copy failed'; });
+}
+</script>
+</body>
+</html>

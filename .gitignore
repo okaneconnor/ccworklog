@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+.claude/
+
+# Written by Claude Code when it loads the mod; it extends the self-ignoring .claude-plugin/types/
+tsconfig.json
